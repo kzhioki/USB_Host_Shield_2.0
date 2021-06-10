@@ -31,9 +31,11 @@
 enum LEDEnum {
         OFF = 0,
 #ifndef RBL_NRF51822
+#ifndef ARDUINO_ARCH_SPRESENSE
         LED1 = 1,
         LED2 = 2,
         LED3 = 3,
+#endif
         LED4 = 4,
 #endif
         LED5 = 5,

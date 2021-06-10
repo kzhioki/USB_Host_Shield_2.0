@@ -122,6 +122,8 @@ typedef SPi< P14, P13, P12, P15 > spi;
 typedef SPi< P18, P23, P19, P5 > spi;
 #elif defined(ARDUINO_NRF52840_FEATHER)
 typedef SPi< P26, P25, P24, P5 > spi;
+#elif defined(ARDUINO_ARCH_SPRESENSE)
+typedef SPi< P23, P16, P17, P24 > spi;
 #else
 #error "No SPI entry in usbhost.h"
 #endif
@@ -179,7 +181,11 @@ template< typename SPI_SS, typename INTR >
 void MAX3421e< SPI_SS, INTR >::regWr(uint8_t reg, uint8_t data) {
         XMEM_ACQUIRE_SPI();
 #if defined(SPI_HAS_TRANSACTION)
+#if defined(ARDUINO_ARCH_SPRESENSE)
+        USB_SPI.beginTransaction(SPISettings(13000000, MSBFIRST, SPI_MODE3)); // The MAX3421E can handle up to 13MHz, use MSB First and SPI mode 3
+#else
         USB_SPI.beginTransaction(SPISettings(26000000, MSBFIRST, SPI_MODE0)); // The MAX3421E can handle up to 26MHz, use MSB First and SPI mode 0
+#endif
 #endif
         SPI_SS::Clear();
 
@@ -222,7 +228,11 @@ template< typename SPI_SS, typename INTR >
 uint8_t* MAX3421e< SPI_SS, INTR >::bytesWr(uint8_t reg, uint8_t nbytes, uint8_t* data_p) {
         XMEM_ACQUIRE_SPI();
 #if defined(SPI_HAS_TRANSACTION)
+#if defined(ARDUINO_ARCH_SPRESENSE)
+        USB_SPI.beginTransaction(SPISettings(13000000, MSBFIRST, SPI_MODE3)); // The MAX3421E can handle up to 13MHz, use MSB First and SPI mode 3
+#else
         USB_SPI.beginTransaction(SPISettings(26000000, MSBFIRST, SPI_MODE0)); // The MAX3421E can handle up to 26MHz, use MSB First and SPI mode 0
+#endif
 #endif
         SPI_SS::Clear();
 
@@ -235,6 +245,23 @@ uint8_t* MAX3421e< SPI_SS, INTR >::bytesWr(uint8_t reg, uint8_t nbytes, uint8_t*
         HAL_SPI_Transmit(&SPI_Handle, &data, 1, HAL_MAX_DELAY);
         HAL_SPI_Transmit(&SPI_Handle, data_p, nbytes, HAL_MAX_DELAY);
         data_p += nbytes;
+#elif defined(ARDUINO_ARCH_SPRESENSE)
+        uint8_t *pbuf = NULL;
+        uint8_t  buff[16];
+        if (nbytes >= sizeof(buff)) {
+                pbuf = (uint8_t *)zalloc(nbytes + 1);
+        } else {
+                pbuf = &buff[0];
+        }
+        if (pbuf) {
+                pbuf[0] = reg | 0x02;
+                memcpy(&pbuf[1], data_p, nbytes);
+                USB_SPI.transfer(pbuf, nbytes + 1);
+                data_p += nbytes;
+                if (nbytes >= sizeof(buff)) {
+                        free(pbuf);
+                }
+        }
 #elif !defined(__AVR__) || !defined(SPDR)
 #if defined(ESP8266) || defined(ESP32)
         yield();
@@ -280,7 +307,11 @@ template< typename SPI_SS, typename INTR >
 uint8_t MAX3421e< SPI_SS, INTR >::regRd(uint8_t reg) {
         XMEM_ACQUIRE_SPI();
 #if defined(SPI_HAS_TRANSACTION)
+#if defined(ARDUINO_ARCH_SPRESENSE)
+        USB_SPI.beginTransaction(SPISettings(13000000, MSBFIRST, SPI_MODE3)); // The MAX3421E can handle up to 13MHz, use MSB First and SPI mode 3
+#else
         USB_SPI.beginTransaction(SPISettings(26000000, MSBFIRST, SPI_MODE0)); // The MAX3421E can handle up to 26MHz, use MSB First and SPI mode 0
+#endif
 #endif
         SPI_SS::Clear();
 
@@ -292,6 +323,13 @@ uint8_t MAX3421e< SPI_SS, INTR >::regRd(uint8_t reg) {
         HAL_SPI_Transmit(&SPI_Handle, &reg, 1, HAL_MAX_DELAY);
         uint8_t rv = 0;
         HAL_SPI_Receive(&SPI_Handle, &rv, 1, HAL_MAX_DELAY);
+        SPI_SS::Set();
+#elif defined(ARDUINO_ARCH_SPRESENSE)
+        uint8_t c[2];
+        c[0] = reg;
+        c[1] = 0;
+        USB_SPI.transfer(c, 2);
+        uint8_t rv = c[1];
         SPI_SS::Set();
 #elif !defined(SPDR) || defined(SPI_HAS_TRANSACTION)
         USB_SPI.transfer(reg);
@@ -319,7 +357,11 @@ template< typename SPI_SS, typename INTR >
 uint8_t* MAX3421e< SPI_SS, INTR >::bytesRd(uint8_t reg, uint8_t nbytes, uint8_t* data_p) {
         XMEM_ACQUIRE_SPI();
 #if defined(SPI_HAS_TRANSACTION)
+#if defined(ARDUINO_ARCH_SPRESENSE)
+        USB_SPI.beginTransaction(SPISettings(13000000, MSBFIRST, SPI_MODE3)); // The MAX3421E can handle up to 13MHz, use MSB First and SPI mode 3
+#else
         USB_SPI.beginTransaction(SPISettings(26000000, MSBFIRST, SPI_MODE0)); // The MAX3421E can handle up to 26MHz, use MSB First and SPI mode 0
+#endif
 #endif
         SPI_SS::Clear();
 
@@ -327,6 +369,23 @@ uint8_t* MAX3421e< SPI_SS, INTR >::bytesRd(uint8_t reg, uint8_t nbytes, uint8_t*
         spi4teensy3::send(reg);
         spi4teensy3::receive(data_p, nbytes);
         data_p += nbytes;
+#elif defined(ARDUINO_ARCH_SPRESENSE)
+        uint8_t *pbuf = NULL;
+        uint8_t  buff[16];
+        if (nbytes >= sizeof(buff)) {
+                pbuf = (uint8_t *)zalloc(nbytes + 1);
+        } else {
+                pbuf = &buff[0];
+        }
+        if (pbuf) {
+                pbuf[0] = reg;
+                USB_SPI.transfer(pbuf, nbytes + 1);
+                memcpy(data_p, &pbuf[1], nbytes);
+                data_p += nbytes;
+                if (nbytes >= sizeof(buff)) {
+                        free(pbuf);
+                }
+        }
 #elif defined(SPI_HAS_TRANSACTION) && !defined(ESP8266) && !defined(ESP32)
         USB_SPI.transfer(reg);
         memset(data_p, 0, nbytes); // Make sure we send out empty bytes

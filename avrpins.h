@@ -1356,6 +1356,43 @@ MAKE_PIN(P33, (9));
 
 #undef MAKE_PIN
 
+#elif defined(ARDUINO_ARCH_SPRESENSE)
+
+#define MAKE_PIN(className, pin) \
+class className { \
+public: \
+  static void Set() { \
+    if ((pin) != 21) return; \
+    digitalWrite(pin, HIGH);\
+  } \
+  static void Clear() { \
+    if ((pin) != 21) return; \
+    digitalWrite(pin, LOW); \
+  } \
+  static void SetDirRead() { \
+    if ((pin) != 21) return; \
+    pinMode(pin, INPUT); \
+  } \
+  static void SetDirWrite() { \
+    if ((pin) != 21) return; \
+    pinMode(pin, OUTPUT); \
+  } \
+  static uint8_t IsSet() { \
+    if ((pin) != 21) return 0; \
+    return digitalRead(pin); \
+  } \
+};
+
+// SS, SCK, MOSI and MISO are defined to avoid compile error.
+// Only INT pin is used.
+MAKE_PIN(P21, (21)); // INT
+MAKE_PIN(P24, (24)); // SS
+MAKE_PIN(P23, (23)); // SCK
+MAKE_PIN(P16, (16)); // MOSI
+MAKE_PIN(P17, (17)); // MISO
+
+#undef MAKE_PIN
+
 #else
 #error "Please define board in avrpins.h"
 
